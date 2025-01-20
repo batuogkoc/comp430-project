@@ -157,7 +157,7 @@ def _regular_training():
                 "num_workers": 2,
             },
             "model": {
-                "type": "resnet-50",
+                "type": "resnet-101",
                 "num_digits": 5,
                 "num_chars": 62,
             },

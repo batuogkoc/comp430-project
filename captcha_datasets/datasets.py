@@ -6,6 +6,8 @@ import os
 from PIL import Image
 from matplotlib import pyplot as plt
 from typing import Literal
+from tqdm import tqdm
+import numpy as np
 
 
 class CaptchaDataset(Dataset):
@@ -19,6 +21,7 @@ class CaptchaDataset(Dataset):
         transform=None,
     ):
         super().__init__()
+        self.dataset_handle = dataset_handle
         if dataset_handle == "akashguna/large-captcha-dataset":
             # https://www.kaggle.com/datasets/akashguna/large-captcha-dataset
             self.dataset_path = os.path.join(
@@ -36,6 +39,8 @@ class CaptchaDataset(Dataset):
         self.paths = os.listdir(self.dataset_path)
         self.transform = transform
         self.label_type = label_type
+
+        self.drop_corrupted_images(use_cached=True)
 
     def __len__(self):
         return len(self.paths)
@@ -71,6 +76,24 @@ class CaptchaDataset(Dataset):
             return ord(char) - ord("a") + 36
         else:
             raise ValueError(f"Invalid character: {char}")
+
+    def drop_corrupted_images(self, use_cached=True):
+        corrupted_images = []
+        if use_cached:
+            if self.dataset_handle == "parsasam/captcha-dataset":
+                corrupted_images = []
+            elif self.dataset_handle == "akashguna/large-captcha-dataset":
+                corrupted_images = ["4q2wA.png"]
+        else:
+            for img_name in tqdm(self.paths):
+                img_path = os.path.join(self.dataset_path, img_name)
+                try:
+                    Image.open(img_path).verify()
+                except:
+                    corrupted_images.append(img_name)
+
+        for corrupted_image in corrupted_images:
+            self.paths.remove(corrupted_image)
 
 
 def get_combined_dataset(transform=None):
