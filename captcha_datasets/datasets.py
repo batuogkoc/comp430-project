@@ -10,6 +10,21 @@ from tqdm import tqdm
 import numpy as np
 
 
+def index_to_char(index):
+    if index <= 9:
+        return chr(index + ord("0"))
+    elif 10 <= index <= 35:
+        return chr(index - 10 + ord("A"))
+    elif 36 <= index <= 61:
+        return chr(index - 36 + ord("a"))
+    else:
+        raise ValueError(f"Invalid index: {index}")
+
+
+def digits_to_label(digits):
+    return "".join([index_to_char(index) for index in digits])
+
+
 class CaptchaDataset(Dataset):
     def __init__(
         self,
