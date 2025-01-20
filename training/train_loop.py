@@ -26,6 +26,7 @@ def train(
     num_epoch: int,
     train_loader: DataLoader,
     val_loader: DataLoader,
+    scheduler: torch.optim.lr_scheduler.LRScheduler = None,
     experiment_name: None | str = None,
     printing: bool = True,
     tensorboard_logging: bool = True,
@@ -93,6 +94,7 @@ def train(
                     "epoch": epoch,
                     "loss": loss.item(),
                     "ratl": running_average_training_loss_logger.get_avg(),
+                    "lr": scheduler.get_lr()[0] if scheduler else -1,
                     **epoch_metric_values,
                 },
                 log_wandb=False,
@@ -112,7 +114,8 @@ def train(
                     printer.print(
                         f"{fraction_done*100:2.2f}% | est time left: {time_taken*(1-fraction_done)/fraction_done:.1f} s | est total: {time_taken/fraction_done:.1f} s"
                     )
-
+        if scheduler:
+            scheduler.step()
         total_time_taken = time.time() - start
 
         log_metrics(
@@ -124,6 +127,7 @@ def train(
                 "loss": running_average_training_loss_logger.get_avg(),
                 "total_time": total_time_taken,
                 "per_epoch_time": total_time_taken / len(train_loader),
+                "lr": scheduler.get_lr()[0] if scheduler else -1,
             },
             log_wandb=wandb_logging,
             tensorboard_writer=tensorboard_writer,
@@ -136,12 +140,13 @@ def train(
             metric.reset()
 
         val_loss_logger.reset()
-
         model.eval()
         with torch.inference_mode():
             for i, (x, y) in enumerate(val_loader):
                 x = x.to(device)
                 y = y.to(device)
+
+                y_pred = model(x)
                 loss = loss_fn(y_pred, y)
                 val_loss_logger.add_value(loss.item())
 
@@ -180,6 +185,9 @@ def train(
                     "optimizer_state_dict": optimizer.state_dict(),
                     "training_loss": running_average_training_loss_logger.get_avg(),
                     "val_loss": val_loss_logger.get_avg(),
+                    "scheduler_state_dict": (
+                        scheduler.state_dict() if scheduler else None
+                    ),
                 },
                 os.path.join(checkpointing_folder, f"{epoch}.pt"),
             )

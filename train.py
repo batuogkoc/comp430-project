@@ -13,6 +13,19 @@ from training.train_loop import train
 from captcha_datasets.datasets import *
 from transformers import AutoImageProcessor, ResNetModel
 from torch import nn
+from pprint import pprint
+
+
+def dict_to_wandb_sweep_constant_config_params(input_dict: dict):
+    ret = {}
+    for key, value in input_dict.items():
+        if type(value) is dict:
+            value = dict_to_wandb_sweep_constant_config_params(value)
+            ret[key] = {"parameters": value}
+        else:
+            ret[key] = {"value": value}
+
+    return ret
 
 
 class ResNetWrapper(nn.Module):
@@ -116,6 +129,13 @@ def train_experiment(config=None):
             raise AttributeError(
                 f"incorrect value for optimizer type: {config['optimizer']['type']}"
             )
+        if not "lr_scheduler" in config.keys():
+            scheduler = None
+        elif config["lr_scheduler"]["type"] == "exponential":
+            scheduler = optim.lr_scheduler.ExponentialLR(
+                optimizer, config["lr_scheduler"]["gamma"]
+            )
+        print(scheduler.get_lr())
         train(
             model=model,
             optimizer=optimizer,
@@ -123,6 +143,7 @@ def train_experiment(config=None):
             num_epoch=config["max_epochs"],
             train_loader=train_loader,
             val_loader=val_loader,
+            scheduler=scheduler,
             experiment_name=EXPERIMENT_NAME,
             printing=True,
             tensorboard_logging=True,
@@ -163,18 +184,53 @@ def _regular_training():
             },
             "optimizer": {
                 "type": "adam",
-                "learning_rate": 1e-4,
+                "learning_rate": 3e-3,
             },
+            "lr_scheduler": {"type": "exponential", "gamma": 0.82},
         }
     )
 
 
-# def _sweep():
-#     sweep_id = wandb.sweep(sweep_config, project="sam2-replication")
-#     wandb.agent(sweep_id, train_experiment, count=6)
+def _sweep():
+    sweep_config = {
+        "method": "grid",
+        "metric": {
+            "name": "val/top-1-acc",
+            "goal": "maximize",
+        },
+        "parameters": {
+            "dataset": {
+                "parameters": {
+                    "batch_size": {"value": 64},
+                    "num_workers": {"value": 2},
+                    "resize_hw": {"value": [224, 224]},
+                    "sample": {"value": "combined"},
+                }
+            },
+            "max_epochs": {"value": 1},
+            "model": {
+                "parameters": {
+                    "num_chars": {"value": 62},
+                    "num_digits": {"value": 5},
+                    "type": {"value": "resnet-101"},
+                }
+            },
+            "optimizer": {
+                "parameters": {
+                    "learning_rate": {"values": [3e-3, 1e-4, 3e-5]},
+                    "type": {"value": "adam"},
+                }
+            },
+            "printing": {"value": True},
+            "rng_seed": {"value": 42},
+            "tensorboard_logging": {"value": True},
+            "wandb_logging": {"value": True},
+        },
+    }
+    sweep_id = wandb.sweep(sweep_config, project="comp430-project")
+    wandb.agent(sweep_id, train_experiment)
 
 
 if __name__ == "__main__":
     # _sweep()
     _regular_training()
-    # _eval()
