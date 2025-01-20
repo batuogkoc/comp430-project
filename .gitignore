@@ -1,5 +1,8 @@
 #other
 .conda
+wandb
+runs_tensorboard
+runs_checkpoints
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

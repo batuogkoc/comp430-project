@@ -6,3 +6,5 @@ matplotlib
 scikit-learn
 torchmetrics
 wandb
+transformers
+tensorboard

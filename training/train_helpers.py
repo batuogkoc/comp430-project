@@ -1,13 +1,6 @@
 import os
 
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-
-import torch
-from torch.utils.data import DataLoader
-import torchmetrics
-import torch.nn as nn
-import time
-from datetime import datetime
 from torch.utils.tensorboard import SummaryWriter
 import wandb
 

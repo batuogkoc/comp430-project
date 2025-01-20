@@ -8,7 +8,7 @@ import time
 import numpy as np
 import torch
 from datasets import *
-from train_helpers import (
+from training.train_helpers import (
     compute_metrics,
     log_metrics_to_wandb,
     log_metrics,
@@ -51,7 +51,11 @@ def train(
 
     printer = InplacePrinter(2 + len(metrics))
 
-    model.to(device)
+    metrics = {
+        metric_name: metric.to(device) for metric_name, metric in metrics.items()
+    }
+
+    model = model.to(device)
     for epoch in range(start_epoch, num_epoch):
         if printing:
             printer.reset()
