@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 import torchvision.transforms as T
 from train import ResNetWrapper
-from captcha_datasets.datasets import CaptchaDataset
+from captcha_datasets.datasets import CaptchaDataset, digits_to_label, index_to_char
 import PIL
 
 
@@ -41,10 +41,10 @@ if __name__ == "__main__":
     PATH = "/Users/idilgorgulu/Desktop/cleaned_checkpoint.pt"
 
     model, loss_fn = load_checkpoint(PATH)
-    x = T.Compose((T.Resize((224, 224)), T.ToTensor()))(PIL.Image.open('12xjG.jpg'))
+    x = T.Compose((T.Resize((224, 224)), T.ToTensor()))(PIL.Image.open('unnamed-3.png'))
     # user code
     y_pred = model(x)
-    print(torch.argmax(y_pred, axis=1))
+    print(digits_to_label(torch.argmax(y_pred, 1)[0]))
     print(y_pred.shape)
     
 
