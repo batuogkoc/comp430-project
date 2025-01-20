@@ -1,0 +1,55 @@
+import torch
+from torch.utils.data import DataLoader
+import torchvision.transforms as T
+from train import ResNetWrapper
+from captcha_datasets.datasets import CaptchaDataset
+import PIL
+
+
+def load_checkpoint(path):
+    checkpoint = torch.load(path, map_location=torch.device('cpu'))
+
+    print(checkpoint.keys())
+
+    model = ResNetWrapper(5, 62, "resnet-101")
+    model.load_state_dict(checkpoint["model_state_dict"])
+
+    loss_fn = torch.nn.CrossEntropyLoss()
+    return model, loss_fn
+
+
+# if __name__ == "__main__":
+
+#     PATH = "/Users/idilgorgulu/Desktop/cleaned_checkpoint.pt"
+
+#     model, loss_fn = load_checkpoint(PATH)
+
+#     # user code
+#     dataset = CaptchaDataset(
+#         "akashguna/large-captcha-dataset",
+#         transform=T.Compose((T.Resize((224, 224)), T.ToTensor())),
+#     )
+#     loader = DataLoader(dataset, batch_size=1, shuffle=True)
+#     x, y = next(iter(loader))
+
+#     y_pred = model(x)
+
+#     print(y)
+#     print(torch.argmax(y_pred, axis=1))
+
+if __name__ == "__main__":
+    PATH = "/Users/idilgorgulu/Desktop/cleaned_checkpoint.pt"
+
+    model, loss_fn = load_checkpoint(PATH)
+    x = T.Compose((T.Resize((224, 224)), T.ToTensor()))(PIL.Image.open('12xjG.jpg'))
+    # user code
+    y_pred = model(x)
+    print(torch.argmax(y_pred, axis=1))
+    print(y_pred.shape)
+    
+
+    # x_perturbed = x - 0.1 * x.grad
+
+    # y_perturbed_pred = model(x_perturbed)
+
+    # print(y, torch.argmax(y_pred, 1), torch.argmax(y_perturbed_pred, 1))
