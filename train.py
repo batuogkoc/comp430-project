@@ -231,6 +231,16 @@ def _sweep():
     wandb.agent(sweep_id, train_experiment)
 
 
+def clean_checkpoint(path):
+    new_path = "cleaned_checkpoint.pt"
+    checkpoint = torch.load(path)
+
+    print(checkpoint.keys())
+    checkpoint.pop("model")
+    torch.save(checkpoint, new_path)
+
+
 if __name__ == "__main__":
     # _sweep()
-    _regular_training()
+    # _regular_training()
+    clean_checkpoint("runs_checkpoints/2025-01-20T16-30-07_resnet/10.pt")

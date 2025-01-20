@@ -3,6 +3,7 @@
 wandb
 runs_tensorboard
 runs_checkpoints
+*.pt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
