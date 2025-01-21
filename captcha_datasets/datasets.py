@@ -1,6 +1,6 @@
 import torch
 import torchvision.transforms as T
-from torch.utils.data import Dataset, ConcatDataset
+from torch.utils.data import Dataset, ConcatDataset, random_split, Subset
 import kagglehub
 import os
 from PIL import Image
@@ -124,14 +124,42 @@ def get_combined_dataset(transform=None):
     return ConcatDataset((dset1, dset2))
 
 
+def split_dataset(dataset, splits=[0.8, 0.1, 0.1], index_cache_path=None):
+    if (not index_cache_path is None) and os.path.isfile(index_cache_path):
+        indices = torch.load(index_cache_path)
+    else:
+        indices = random_split(torch.arange(len(dataset)), splits)
+        if index_cache_path is not None:
+            torch.save(indices, index_cache_path)
+
+    sets = []
+    for split_indices in indices:
+        sets.append(Subset(dataset, split_indices))
+
+    return sets, indices
+
+
 if __name__ == "__main__":
     # dataset = CaptchaDataset(
     #     "parsasam/captcha-dataset",
     #     transform=T.Compose([T.Resize((512, 512)), T.ToTensor()]),
     # )
+    # dataset = get_combined_dataset(T.Compose([T.Resize((512, 512)), T.ToTensor()]))
+    # x, y = dataset[130000]
+    # print(len(dataset))
+    # print(y.shape)
+    # plt.imshow(torch.permute(x, (1, 2, 0)))
+    # plt.savefig("image.png")
+
     dataset = get_combined_dataset(T.Compose([T.Resize((512, 512)), T.ToTensor()]))
-    x, y = dataset[130000]
-    print(len(dataset))
-    print(y.shape)
-    plt.imshow(torch.permute(x, (1, 2, 0)))
-    plt.savefig("image.png")
+    splits, indices = split_dataset(
+        dataset, [0.8, 0.1, 0.1], "combined_dset_splits_index_cache.pt"
+    )
+
+    print(len(splits))
+    print([len(split) for split in splits])
+    print(len(indices))
+    print([len(index) for index in indices])
+    print(indices[0][0])
+    print(indices[1][0])
+    print(indices[2][0])

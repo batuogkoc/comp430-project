@@ -54,6 +54,34 @@ class ResNetWrapper(nn.Module):
         )
 
 
+class ResNetWrapperDifferentiable(nn.Module):
+    def __init__(self, num_digits, num_chars, type="resnet-50"):
+        super().__init__()
+        self.image_processor = T.Compose(
+            [
+                T.Resize((224, 224)),
+                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ]
+        )
+        self.model = ResNetModel.from_pretrained(f"microsoft/{type}")
+        self.head = nn.Sequential(
+            nn.AvgPool2d(7), nn.Flatten(), nn.Linear(2048, num_digits * num_chars)
+        )
+        self.num_digits = num_digits
+        self.num_chars = num_chars
+
+    def forward(self, x):
+        assert type(x) == torch.Tensor, "input must be a tensor"
+        inputs = self.image_processor(x)
+        outputs = self.model(pixel_values=inputs)
+        last_hidden_states = outputs.last_hidden_state
+        flattened_output = self.head(last_hidden_states)
+        return torch.reshape(
+            flattened_output,
+            [flattened_output.shape[0], self.num_chars, self.num_digits],
+        )
+
+
 def train_experiment(config=None):
     # Constants
     EXPERIMENT_NAME = "" + datetime.now().strftime("%Y-%m-%dT%H-%M-%S") + "_resnet"
@@ -88,7 +116,11 @@ def train_experiment(config=None):
                 f"Invalid dataset sample: {config['dataset']['sample']}"
             )
 
-        train_set, val_set = random_split(raw_dataset, [0.8, 0.2])
+        (train_set, val_set, test_set), _ = split_dataset(
+            raw_dataset,
+            [0.8, 0.1, 0.1],
+            f"{config['dataset']['sample']}_splits_indices.cache",
+        )
 
         assert len(train_set) > len(
             val_set
@@ -110,11 +142,18 @@ def train_experiment(config=None):
         if config["printing"]:
             print("Setting up model, optim, etc...")
 
-        model = ResNetWrapper(
-            num_digits=config["model"]["num_digits"],
-            num_chars=config["model"]["num_chars"],
-            type=config["model"]["type"],
-        )
+        if config["model"]["use_differentiable"]:
+            model = ResNetWrapperDifferentiable(
+                num_digits=config["model"]["num_digits"],
+                num_chars=config["model"]["num_chars"],
+                type=config["model"]["type"],
+            )
+        else:
+            model = ResNetWrapper(
+                num_digits=config["model"]["num_digits"],
+                num_chars=config["model"]["num_chars"],
+                type=config["model"]["type"],
+            )
         loss_fn = torch.nn.CrossEntropyLoss()
 
         if config["optimizer"]["type"] == "rmsprop":
@@ -179,6 +218,7 @@ def _regular_training():
             },
             "model": {
                 "type": "resnet-101",
+                "use_differentiable": True,
                 "num_digits": 5,
                 "num_chars": 62,
             },
@@ -242,5 +282,5 @@ def clean_checkpoint(path):
 
 if __name__ == "__main__":
     # _sweep()
-    # _regular_training()
-    clean_checkpoint("runs_checkpoints/2025-01-20T16-30-07_resnet/10.pt")
+    _regular_training()
+    # clean_checkpoint("runs_checkpoints/2025-01-20T16-30-07_resnet/10.pt")
