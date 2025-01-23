@@ -34,6 +34,7 @@ class CaptchaDataset(Dataset):
         label_type: Literal["string", "digits"] = "digits",
         force_download=False,
         transform=None,
+        use_cache_when_dropping_corrupted=True,
     ):
         super().__init__()
         self.dataset_handle = dataset_handle
@@ -48,6 +49,9 @@ class CaptchaDataset(Dataset):
         elif dataset_handle == "parsasam/captcha-dataset":
             # https://www.kaggle.com/datasets/parsasam/captcha-dataset/data
             self.dataset_path = kagglehub.dataset_download("parsasam/captcha-dataset")
+        elif os.path.isdir(self.dataset_handle):
+            self.dataset_path = self.dataset_handle
+            use_cache_when_dropping_corrupted = False
         else:
             raise AttributeError(f"Incorrect dataset handle: {dataset_handle}")
 
@@ -55,7 +59,7 @@ class CaptchaDataset(Dataset):
         self.transform = transform
         self.label_type = label_type
 
-        self.drop_corrupted_images(use_cached=True)
+        self.drop_corrupted_images(use_cached=use_cache_when_dropping_corrupted)
 
     def __len__(self):
         return len(self.paths)
@@ -100,6 +104,7 @@ class CaptchaDataset(Dataset):
             elif self.dataset_handle == "akashguna/large-captcha-dataset":
                 corrupted_images = ["4q2wA.png"]
         else:
+            print("looking for corrupted images")
             for img_name in tqdm(self.paths):
                 img_path = os.path.join(self.dataset_path, img_name)
                 try:
