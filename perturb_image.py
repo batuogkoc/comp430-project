@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import random
 from PIL import Image, ImageDraw, ImageFilter
 
 def apply_random_patch(image):
@@ -90,7 +91,8 @@ def create_perturbed_images(input_folder, output_folder, max_images=100):
     os.makedirs(output_folder, exist_ok=True)
 
     image_files = [f for f in os.listdir(input_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff'))]
-    image_files = sorted(image_files)[:max_images]  
+    random.shuffle(image_files) 
+    image_files = image_files[:max_images] 
 
     for filename in image_files:
         input_path = os.path.join(input_folder, filename)
@@ -108,7 +110,7 @@ def create_perturbed_images(input_folder, output_folder, max_images=100):
             print(f"Error processing {filename}: {e}")
 
 if __name__ == "__main__":
-    input_folder = "archive" 
-    output_folder = "perturbed_images" 
+    input_folder = "/Users/idilgorgulu/Desktop/test_sample_for_patch" 
+    output_folder = "perturbed_images/patch" 
 
     create_perturbed_images(input_folder, output_folder, max_images=100)
