@@ -2,28 +2,45 @@ import os
 import numpy as np
 import random
 from PIL import Image, ImageDraw, ImageFilter
+import torch
+from torch.utils.data import DataLoader, Subset
+import torchvision.transforms as T
+from train import ResNetWrapper
+from captcha_datasets.datasets import (
+    CaptchaDataset,
+    index_to_char,
+    digits_to_label,
+    get_combined_dataset,
+    split_dataset,
+)
+from matplotlib import pyplot as plt
+from evaluate_performance import load_checkpoint, evaluate_performance
+from tqdm import tqdm
+import numpy as np
+
 
 def apply_random_patch(image):
-
     image_with_patch = image.copy()
     draw = ImageDraw.Draw(image_with_patch)
 
     num_patches = np.random.randint(1, 6) 
 
     for _ in range(num_patches):
-        patch_ratio = np.random.uniform(0.1, 0.3) 
+        patch_ratio = np.random.uniform(0.15, 0.3) 
         patch_size = int(min(image.width, image.height) * patch_ratio)
-        patch_size = max(1, patch_size)  
+        patch_size = max(10, patch_size) 
 
         patch_color = tuple(np.random.randint(0, 256, size=3)) 
-
         alpha = np.random.randint(50, 200)  
 
-        max_x = image.width - patch_size
-        max_y = image.height - patch_size
+        center_x = image.width // 2
+        center_y = image.height // 2
 
-        top_left_x = np.random.randint(0, max_x + 1)
-        top_left_y = np.random.randint(0, max_y + 1)
+        max_offset_x = max(1, (image.width - patch_size) // 2) 
+        max_offset_y = max(1, (image.height - patch_size) // 2)
+
+        top_left_x = np.random.randint(center_x - max_offset_x, center_x + max_offset_x - patch_size + 1)
+        top_left_y = np.random.randint(center_y - max_offset_y, center_y + max_offset_y - patch_size + 1)
 
         shape_type = np.random.choice(["rectangle", "circle", "ellipse", "polygon", "line", "star"])
 
@@ -81,10 +98,11 @@ def apply_random_patch(image):
 
         image_with_patch = Image.alpha_composite(image_with_patch.convert("RGBA"), overlay).convert("RGB")
 
-    blur_radius = np.random.uniform(1.5, 1.5)  
+    blur_radius = np.random.uniform(1.0, 1.20)
     image_with_patch = image_with_patch.filter(ImageFilter.GaussianBlur(blur_radius))
 
     return image_with_patch
+
 
 def create_perturbed_images(input_folder, output_folder, max_images=100):
 
@@ -109,8 +127,71 @@ def create_perturbed_images(input_folder, output_folder, max_images=100):
         except Exception as e:
             print(f"Error processing {filename}: {e}")
 
+def visualize(model, loader, num, device):
+    image_files = [
+        f for f in os.listdir("/Users/idilgorgulu/Desktop/test_sample_for_patch")
+        if f.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".tiff"))
+    ]
+    image_files = [os.path.join("/Users/idilgorgulu/Desktop/test_sample_for_patch", f) for f in image_files]
+
+    model.eval()
+    model.to(device)
+    num = 3 
+    fig, axs = plt.subplots(num, 2, figsize=(10, num * 3))
+    fig.subplots_adjust(wspace=0.2, hspace=0.3)
+
+    for i, (x, y) in enumerate(loader):
+        if i >= num:
+            break
+
+        image_path1 = random.choice(image_files)
+        image1 = Image.open(image_path1)
+        x_perturbed1 = apply_random_patch(image1)  
+        x_perturbed1 = x_perturbed1.convert("RGB")
+        x_perturbed1 = transforms(x_perturbed1).unsqueeze(0).to(device)
+
+        y_perturbed_pred1 = model(x_perturbed1)
+        y_perturbed_pred_str1 = digits_to_label(torch.argmax(y_perturbed_pred1, 1)[0])  
+
+        axs[i, 0].imshow(torch.permute(x_perturbed1[0], (1, 2, 0)).detach().cpu().numpy())
+        axs[i, 0].set_title(f"P: {y_perturbed_pred_str1}", fontsize=10)
+        axs[i, 0].axis("off")  
+
+        image_path2 = random.choice(image_files)
+        image2 = Image.open(image_path2)
+        x_perturbed2 = apply_random_patch(image2) 
+        x_perturbed2 = x_perturbed2.convert("RGB")
+        x_perturbed2 = transforms(x_perturbed2).unsqueeze(0).to(device)
+
+        y_perturbed_pred2 = model(x_perturbed2)
+        y_perturbed_pred_str2 = digits_to_label(torch.argmax(y_perturbed_pred2, 1)[0])
+        axs[i, 1].imshow(torch.permute(x_perturbed2[0], (1, 2, 0)).detach().cpu().numpy())
+        axs[i, 1].set_title(f"P: {y_perturbed_pred_str2}", fontsize=10)
+        axs[i, 1].axis("off")  # Turn off axes
+
+    fig.savefig("visualization_patch_new.png")
+
 if __name__ == "__main__":
     input_folder = "/Users/idilgorgulu/Desktop/test_sample_for_patch" 
     output_folder = "perturbed_images/patch" 
-
     create_perturbed_images(input_folder, output_folder, max_images=100)
+    DEVICE = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    print(f"Using device: {DEVICE}")
+
+    CHECKPOINT_PATH = "/Users/idilgorgulu/Desktop/cleaned_checkpoint_1.pt"
+    model, loss_fn = load_checkpoint(CHECKPOINT_PATH, DEVICE)
+    transforms = T.Compose(
+        (
+            T.Resize((224, 224)),
+            T.ToTensor(),
+        )
+    ) 
+    (train_set, val_set, test_set), _ = split_dataset(
+        get_combined_dataset(transforms),
+        [0.8, 0.1, 0.1],
+        "combined_splits_indices.cache",
+    )
+    loader = DataLoader(test_set, batch_size=1, shuffle=True)
+
+    num_samples_to_visualize = 5 
+    visualize(model, loader, num_samples_to_visualize, DEVICE)
